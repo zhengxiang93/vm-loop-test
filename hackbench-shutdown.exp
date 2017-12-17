@@ -1,0 +1,109 @@
+#!/usr/bin/expect -f
+
+set disk [lindex $argv 0]
+set userirq [lindex $argv 1]
+set others [lrange $argv 1 end]
+
+if {$userirq=="-userirq"} {
+	set others [lrange $argv 2 end]
+} else {
+	set userirq ""
+}
+
+spawn ./run-guest$userirq.sh -i $disk {*}$others
+set exit_code 0
+
+set timeout 30
+set first_run 1
+
+expect {
+	timeout { exit 1 }
+	"Booting Linux" {
+
+		expect {
+			timeout {
+				send_user "Not seeing login prompt"
+				parray expect_out
+				exit 1
+			}
+			"root@*:*# $"
+		}
+
+		sleep 5
+		set timeout 5
+		send "./hackbench 100 process 100\n"
+		set retry 0
+		expect {
+			timeout {
+				if { $retry == 0 } {
+					set retry 1
+					send_user "Did not see hackbench start. Retrying...\n"
+					sleep 2
+					send "./hackbench 100 process 100\n"
+					exp_continue
+				}
+				send "halt -p\n"
+				exit 2
+			}
+			"./hackbench: No such file or directory" {
+				send "halt -p\n"
+				exit 3
+			}
+			"Running with 100*40 (== 4000) tasks."
+		}
+
+		set timeout 60
+		expect {
+			timeout { 
+				send_user "Did not see hackbench finish\n"
+				set exit_code 4
+			}
+			"Time:*\n" {
+				sleep 2
+				send "\n"
+			}
+		}
+
+		set timeout 30
+		send "cyclictest -t 4 -l 10000"
+		expect {
+			timeout { exit 5 }
+			"root@*:*#" { 
+				sleep 2
+				send "\n"
+			}
+		}
+
+
+		sleep 2
+		if { $first_run == 1 } {
+			expect {
+				timeout { exit 5 }
+				"root@*:*#" { 
+					set first_run 0
+					send "reboot\n"
+				}
+			}
+
+			expect {
+				timeout { exit 6 }
+				"reboot: Restarting system"
+			}
+
+			exp_continue
+		} else {
+			expect {
+				timeout { exit 7 }
+				"root@*:*#" { send "halt -p\n" }
+			}
+
+			expect {
+				timeout { exit 8 }
+				"reboot: Power down"
+			}
+		}
+
+	}
+}
+
+exit $exit_code
