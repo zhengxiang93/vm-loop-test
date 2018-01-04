@@ -1,0 +1,6 @@
+*.qcow2
+debian-sid
+qemu-system-aarch64
+linux
+Image
+tmp-*

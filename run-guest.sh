@@ -1,15 +1,12 @@
 #!/bin/bash
 
-QEMU=${QEMU:-~/qemu-system-aarch64}
 CONSOLE=mon:stdio
-SMP=4
-MEMSIZE=$((14 * 1024))
+SMP=16
+MEMSIZE=$((4 * 1024))
 KERNEL=Image
-declare -a INCOMING
-FS=arm64-trusty.img
+FS=debian-sid.qcow2
 CMDLINE=""
 DUMPDTB=""
-KERNEL_IRQCHIP="on"
 DTB=""
 QMP=""
 ALTCON=""
@@ -23,11 +20,10 @@ usage() {
 	U="${U}Options:\n"
 	U="$U    -c | --CPU <nr>:       Number of cores (default ${SMP})\n"
 	U="$U    -m | --mem <MB>:       Memory size (default ${MEMSIZE})\n"
-	U="$U    -k | --kernel <Image>: Use kernel image (default ${KERNEL})\n"
+	U="$U    --kernel <Image>:      Guest kernel image (default ${KERNEL})\n"
+	U="$U    --fs <image>:          Guest file system (default $FS)\n"
 	U="$U    -s | --serial <file>:  Output console to <file>\n"
-	U="$U    -i | --image <image>:  Use <image> as block device (default $FS)\n"
 	U="$U    -a | --append <snip>:  Add <snip> to the kernel cmdline\n"
-	U="$U    --userirq:             Don't use an in-kernel GIC\n"
 	U="$U    --alt-console <port>:  Listen for virtio console on telnet <port>\n"
 	U="$U    --qmp <path>           Listen for UNIX QMP socket on <path>\n"
 	U="$U    --dumpdtb <file>       Dump the generated DTB to <file>\n"
@@ -48,7 +44,7 @@ do
 		MEMSIZE="$2"
 		shift 2
 		;;
-	  -k | --kernel)
+	  --kernel)
 		KERNEL="$2"
 		shift 2
 		;;
@@ -56,20 +52,12 @@ do
 		CONSOLE="file:$2"
 		shift 2
 		;;
-	  -i | --image)
+	  --fs)
 		FS="$2"
 		shift 2
 		;;
 	  -a | --append)
 		CMDLINE="$2"
-		shift 2
-		;;
-	  --userirq)
-		KERNEL_IRQCHIP="off"
-		shift 1
-		;;
-	  --incoming)
-		INCOMING=(-incoming "exec: gzip -c -d $2")
 		shift 2
 		;;
 	  --qmp)
@@ -86,7 +74,7 @@ do
 		;;
 	  --alt-console)
 		PORT="$2"
-		ALTCON="-chardev socket,server,host=*,nowait,port=$PORT,telnet,id=mychardev,logfile=/tmp/foo.txt"
+		ALTCON="-chardev socket,server,host=*,nowait,port=$PORT,telnet,id=mychardev"
 		ALTCON="$ALTCON -device virtio-serial-device"
 		ALTCON="$ALTCON -device virtconsole,chardev=mychardev"
 		shift 2
@@ -109,25 +97,18 @@ do
 	esac
 done
 
-        #-netdev bridge,id=net0 \
-
-$QEMU \
-        -smp $SMP -m $MEMSIZE -machine virt${DUMPDTB},kernel_irqchip=$KERNEL_IRQCHIP -cpu host \
+./qemu-system-aarch64 \
+        -smp $SMP -m $MEMSIZE -machine virt,gic-version=host${DUMPDTB} -cpu host \
         -kernel ${KERNEL} -enable-kvm ${DTB} \
-        -drive if=none,file=$FS,id=vda,format=raw,cache=none \
+        -drive if=none,file=$FS,id=vda,format=qcow2,cache=none \
         -device virtio-blk-pci,drive=vda \
-	-netdev tap,id=net0,helper=/usr/local/bin/qemu-bridge-helper,vhost=on \
+	-netdev user,id=net0 \
         -device virtio-net-pci,netdev=net0 \
 	$QMP \
-	"${INCOMING[@]}" \
         -display none \
 	-serial $CONSOLE \
 	$ALTCON \
-	-append "console=ttyAMA0 root=/dev/vda rw $CMDLINE earlycon"
-
-	#-incoming "exec: gzip -c -d STATEFILE.gz" \
-
-        #-netdev bridge,id=net0 \
+	-append "console=ttyAMA0 root=/dev/vda1 rw $CMDLINE earlycon"
 
 	#-chardev stdio,id=mychardev \
 	#-device virtio-serial-device \
