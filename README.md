@@ -22,3 +22,19 @@ You can either create these files manually (for example by copying the from
 somewhere) or you can run setup-loop-test.sh when you first clone this repo to
 have them automatically generated for you (it will attempt to clone and compile
 the latest released Linux and QEMU versions and create a Debian sid image).
+
+Usage
+-----
+Simply run `./loop-test.sh <j>` where `<j>` is the number of parallel guests you
+want to run.
+
+Hints
+-----
+You can enjoy the progress of this test script by following the guest outputs
+doing something like this:
+
+```bash
+tail -F tmp-$PID/guest0.log
+```
+
+Assuming $PID is the PID of the loop-test.sh. script.
