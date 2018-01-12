@@ -77,13 +77,16 @@ function ctrl_c() {
 EXIT_CODE1=0
 EXIT_CODE2=0
 
-IMGDIR=tmp-$$
-mkdir -p $IMGDIR
+mkdir -p /tmp/vm-loop-test
+IMGDIR=`mktemp -d -p /tmp/vm-loop-test`
+
+#IMGDIR=tmp-$$
+#mkdir -p $IMGDIR
 
 for i in `seq 0 $((J - 1))`; do
 	imgs[$i]=$IMGDIR/guest$i.qcow2
 	logs[$i]=$IMGDIR/guest$i.log
-	qemu-img create -b ../debian-sid.qcow2 -F qcow2 -f qcow2 ${imgs[$i]}
+	qemu-img create -b "`pwd`/${FS}" -F qcow2 -f qcow2 ${imgs[$i]}
 done
 
 iter=1
