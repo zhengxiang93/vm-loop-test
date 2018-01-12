@@ -3,24 +3,20 @@
 ############################# Init and configuration ##################
 RESULT=0
 J=1
-KERNEL=Image
 FS=debian-sid.qcow2
-CMDLINE=""
 
 usage() {
 	U=""
 	if [[ -n "$1" ]]; then
 		U="${U}$1\n\n"
 	fi
-	U="${U}Usage: $0 [options]\n\n"
+	U="${U}Usage: $0 [options [--]] [arguments]\n\n"
 	U="${U}Options:\n"
-	U="$U    -c | --CPU <nr>:       Number of cores (default ${SMP})\n"
-	U="$U    -m | --mem <MB>:       Memory size (default ${MEMSIZE})\n"
-	U="$U    --kernel <Image>:      Guest kernel image (default ${KERNEL})\n"
 	U="$U    --fs <image>:          Guest file system (default $FS)\n"
-	U="$U    -a | --append <snip>:  Add <snip> to the kernel cmdline\n"
 	U="$U    -j <i>:                Run <i> guests in parallel (default: $J)\n"
 	U="$U    -h | --help:           Show this output\n"
+	U="${U}\n"
+	U="${U}Remaining arguments are passed down to the run script.\n"
 	U="${U}\n"
 	echo -e "$U" >&2
 }
@@ -28,24 +24,8 @@ usage() {
 while :
 do
 	case "$1" in
-	  -c | --cpu)
-		SMP="$2"
-		shift 2
-		;;
-	  -m | --mem)
-		MEMSIZE="$2"
-		shift 2
-		;;
-	  --kernel)
-		KERNEL="$2"
-		shift 2
-		;;
 	  --fs)
 		FS="$2"
-		shift 2
-		;;
-	  -a | --append)
-		CMDLINE="$2"
 		shift 2
 		;;
 	  -j)
@@ -65,8 +45,7 @@ do
 		break
 		;;
 	  -*) # Unknown option
-		echo "Error: Unknown option: $1" >&2
-		exit 1
+		break
 		;;
 	  *)
 		break
@@ -81,8 +60,15 @@ trap ctrl_c INT
 RUN=true
 
 function ctrl_c() {
+	if ! $RUN; then
+		echo "Pressed ctrl+c twice, killing all guests."
+		for i in `seq 0 $((J - 1))`; do
+			kill ${pids[$i]}
+		done
+		exit 1
+	fi
 	echo "Waiting for guests to exit current round of testing..."
-        RUN=false
+	RUN=false
 }
 #######################################################################
 
@@ -106,7 +92,9 @@ do
 	echo "Running $J guest(s): Round: $iter"
 
 	for i in `seq 0 $((J - 1))`; do
-		setsid expect hackbench-shutdown.exp --fs ${imgs[$i]} --alt-console $((5000 + i)) $@ > ${logs[$i]} &
+		setsid expect hackbench-shutdown.exp \
+			--fs ${imgs[$i]} \
+			--alt-console $((5000 + i)) $@ > ${logs[$i]} &
 		pids[$i]=$!
 	done
 
