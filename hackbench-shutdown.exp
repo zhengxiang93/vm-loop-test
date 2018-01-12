@@ -5,8 +5,12 @@ set arguments [lrange $argv 0 end]
 spawn ./run-guest.sh {*}$arguments
 set exit_code 0
 
-set timeout 30
+set timeout 180
 set first_run 1
+
+# You may want lower values here on less powerful systems (like models)
+set hackbench_groups 500
+set hackbench_loops 100
 
 proc status_output { status_string } {
     send_error "$status_string\n"
@@ -27,14 +31,13 @@ expect {
 			timeout {
 				report_fail 1 "Not seeing login prompt or incorrect username/password"
 			}
+			"Last login:" { exp_continue }
 			"login:" { send "root\n"; exp_continue }
 			"Password:" { send "kvm\n"; exp_continue }
 			"root@*:*# $"
 		}
 
-		sleep 5
-		set timeout 25
-		send "./hackbench 500 process 100\n"
+		send "./hackbench $hackbench_groups process $hackbench_loops\n"
 		set retry 0
 		expect {
 			timeout {
@@ -55,35 +58,26 @@ expect {
 			"Running with"
 		}
 
-		set timeout 60
 		expect {
 			timeout { 
 				report_fail 4 "Did not see hackbench finish"
 			}
-			"Time:*\n" {
-				sleep 2
-				send "\n"
-			}
+			"Time:*\n"
 		}
 
-		set timeout 60
-		send "cyclictest -t `nproc` -l 10000"
 		expect {
 			timeout { 
-				report_fail 5 "Never saw cyclictest complete"
+				report_fail 4 "Did not see prompt after hackbench"
 			}
-			"root@*:*#" { 
-				sleep 2
-				send "\n"
+			"root@*:*#" {
+				send "cyclictest -t `nproc` -l 10000\n"
 			}
 		}
 
-
-		sleep 2
 		if { $first_run == 1 } {
 			expect {
 				timeout { 
-					report_fail 6 "Never saw prompt after sleep?"
+					report_fail 6 "Never saw prompt after cyclictest"
 				}
 				"root@*:*#" { 
 					set first_run 0
@@ -102,11 +96,9 @@ expect {
 		} else {
 			expect {
 				timeout {
-					report_fail 1 "Not seeing login prompt or incorrect username/password"
+					report_fail 6 "Never saw prompt after cyclictest"
 				}
-				"login:" { send "root\n"; exp_continue }
-				"Password:" { send "kvm\n"; exp_continue }
-				"root@*:*# $" { send "halt -p\n" }
+				"root@*:*#" { send "halt -p\n" }
 			}
 
 			expect {
