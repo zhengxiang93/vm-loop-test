@@ -1,8 +1,8 @@
 #!/bin/bash
 
 CONSOLE=mon:stdio
-SMP=16
-MEMSIZE=$((4 * 1024))
+SMP=2
+MEMSIZE=$((2 * 1024))
 KERNEL=Image
 FS=debian-sid.qcow2
 CMDLINE=""
@@ -10,6 +10,8 @@ DUMPDTB=""
 DTB=""
 QMP=""
 ALTCON=""
+GIC_VERSION=host
+IRQCHIP="kernel_irqchip=on"
 
 usage() {
 	U=""
@@ -25,6 +27,8 @@ usage() {
 	U="$U    -s | --serial <file>:  Output console to <file>\n"
 	U="$U    -a | --append <snip>:  Add <snip> to the kernel cmdline\n"
 	U="$U    --alt-console <port>:  Listen for virtio console on telnet <port>\n"
+	U="$U    --userirq:             Use a userspace irqchip\n"
+	U="$U    --gicv2:               Run GICv2 guest even on GICv3 host\n"
 	U="$U    --qmp <path>           Listen for UNIX QMP socket on <path>\n"
 	U="$U    --dumpdtb <file>       Dump the generated DTB to <file>\n"
 	U="$U    --dtb <file>           Use the supplied DTB instead of the auto-generated one\n"
@@ -72,6 +76,14 @@ do
 		DTB="-dtb $2"
 		shift 2
 		;;
+	  --userirq)
+		IRQCHIP="kernel_irqchip=off"
+		shift 1
+		;;
+	  --gicv2)
+		GIC_VERSION=2
+		shift 1
+		;;
 	  --alt-console)
 		PORT="$2"
 		ALTCON="-chardev socket,server,host=*,nowait,port=$PORT,telnet,id=mychardev"
@@ -98,12 +110,12 @@ do
 done
 
 ./qemu-system-aarch64 \
-        -smp $SMP -m $MEMSIZE -machine virt,gic-version=host${DUMPDTB} -cpu host \
+        -smp $SMP -m $MEMSIZE -machine virt,gic-version=${GIC_VERSION},${IRQCHIP}${DUMPDTB} -cpu host \
         -kernel ${KERNEL} -enable-kvm ${DTB} \
         -drive if=none,file=$FS,id=vda,format=qcow2,cache=none \
         -device virtio-blk-pci,drive=vda \
 	-netdev user,id=net0 \
-        -device virtio-net-pci,netdev=net0 \
+        -device virtio-net-pci,netdev=net0,rombar=0 \
 	$QMP \
         -display none \
 	-serial $CONSOLE \
