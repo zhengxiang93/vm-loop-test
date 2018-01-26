@@ -96,6 +96,7 @@ do
 
 	for i in `seq 0 $((J - 1))`; do
 		setsid expect hackbench-shutdown.exp \
+			"guest$i" \
 			--fs ${imgs[$i]} \
 			--alt-console $((5000 + i)) $@ > ${logs[$i]} &
 		pids[$i]=$!

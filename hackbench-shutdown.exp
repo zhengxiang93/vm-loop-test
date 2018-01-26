@@ -1,6 +1,7 @@
 #!/usr/bin/expect -f
 
-set arguments [lrange $argv 0 end]
+set guest [lindex $argv 0]
+set arguments [lrange $argv 1 end]
 
 spawn ./run-guest.sh {*}$arguments
 set exit_code 0
@@ -13,11 +14,11 @@ set hackbench_groups 500
 set hackbench_loops 100
 
 proc status_output { status_string } {
-    send_error "$status_string\n"
+    send_error "$guest: $status_string\n"
 }
 
 proc report_fail { error_code error_string } {
-    status_output "$error_string"
+    status_output "$guest: $error_string"
     #set timeout -1
     #expect eof
     exit $error_code
