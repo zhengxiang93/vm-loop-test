@@ -36,7 +36,7 @@ else
 fi
 
 pushd $QEMUDIR
-VERSION=`git tag | grep '^v[0-9]\+\.[0-9]\+\.[0-9]\+$' | sort | tail -n 1`
+VERSION=`git tag | grep '^v[0-9]\+\.[0-9]\+\.[0-9]\+$' | sort -V | tail -n 1`
 echo "Building QEMU $VERSION..."
 git checkout $VERSION
 git submodule update --init dtc
