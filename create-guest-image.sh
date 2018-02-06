@@ -44,7 +44,8 @@ fi
 
 if [[ ! -d "$NAME" ]]; then
 	echo "Debootstapping a debian directory for you..."
-	sudo debootstrap --arch arm64 sid `pwd`/"$NAME" http://ftp.debian.org/debian ||
+	sudo debootstrap --include=rt-tests,build-essential \
+                         --arch arm64 sid `pwd`/"$NAME" http://ftp.debian.org/debian ||
 		error_exit "debootstrap failed"
 	echo "root:kvm" | sudo chpasswd --root `pwd`/"$NAME"
 fi
@@ -74,8 +75,6 @@ echo "Copy complete"
 
 echo "Configuring guest file system"
 sudo cp hackbench.c tmp-mount/root/.
-sudo chroot tmp-mount apt-get update
-sudo chroot tmp-mount apt-get install -y rt-tests build-essential
 sudo chroot tmp-mount gcc -o /root/hackbench -pthread /root/hackbench.c
 echo "DefaultTasksMax=infinity" | sudo tee -a tmp-mount/etc/systemd/system.conf
 
